@@ -91,4 +91,12 @@ const createUserNames = function (accs) {
 };
 
 createUserNames(accounts);
-console.log(accounts);
+
+const calcPrintBalance = function (accs) {
+  accs.forEach(function (acc) {
+    acc.balance = acc.movements.reduce((accu, val) => accu + val, 0);
+  });
+  labelBalance.textContent = `${account1.balance} £`;
+};
+
+calcPrintBalance(accounts);
