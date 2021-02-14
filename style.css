@@ -87,7 +87,7 @@ nav {
   gap: 2rem;
 
   /* fade in/out anumation */
-  /* opacity: 0; */
+  opacity: 0;
   transition: all 1s;
 }
 

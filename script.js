@@ -78,7 +78,26 @@ const displayMovements = function (movements) {
     containerMovements.insertAdjacentHTML("afterbegin", html);
   });
 };
-displayMovements(account1.movements);
+
+const calcDisplaySummary = function (acc) {
+  const incomes = acc.movements
+    .filter((mov) => mov > 0)
+    .reduce((acc, mov) => acc + mov, 0);
+  labelSumIn.textContent = `${incomes}£`;
+
+  const out = acc.movements
+    .filter((mov) => mov < 0)
+    .reduce((acc, mov) => acc + mov, 0);
+  labelSumOut.textContent = `${Math.abs(out)}£`;
+
+  //assuming the bank takes interest on each deposit of 1.2%
+  const interest = acc.movements
+    .filter((mov) => mov > 0)
+    .map((deposit) => (deposit * acc.interestRate) / 100)
+    .reduce((acc, int) => acc + int, 0);
+
+  labelSumInterest.textContent = `${interest}£`;
+};
 
 const createUserNames = function (accs) {
   accs.forEach(function (acc) {
@@ -89,14 +108,33 @@ const createUserNames = function (accs) {
       .join("");
   });
 };
-
 createUserNames(accounts);
 
-const calcPrintBalance = function (accs) {
-  accs.forEach(function (acc) {
-    acc.balance = acc.movements.reduce((accu, val) => accu + val, 0);
-  });
-  labelBalance.textContent = `${account1.balance} £`;
-};
+let currentAccount;
+btnLogin.addEventListener("click", function (e) {
+  e.preventDefault();
 
-calcPrintBalance(accounts);
+  currentAccount = accounts.find(
+    (acc) => acc.userName === inputLoginUsername.value
+  );
+
+  if (currentAccount?.pin === Number(inputLoginPin.value)) {
+    //Display UI and message
+    labelWelcome.textContent = `Welcome back, ${
+      currentAccount.owner.split(" ")[0]
+    }`;
+    containerApp.style.opacity = 100;
+    //Display movements
+    displayMovements(currentAccount.movements);
+    //display balance
+    calcPrintBalance(currentAccount.movements);
+    //display summary
+    calcDisplaySummary(currentAccount);
+  }
+});
+
+const calcPrintBalance = function (movements) {
+  const balance = movements.reduce((accu, val) => accu + val, 0);
+
+  labelBalance.textContent = `${balance} £`;
+};
