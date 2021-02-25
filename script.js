@@ -106,7 +106,7 @@ const inputLoanAmount = document.querySelector(".form__input--loan-amount");
 const inputCloseUsername = document.querySelector(".form__input--user");
 const inputClosePin = document.querySelector(".form__input--pin");
 
-const formarMovementDate = function (date) {
+const formarMovementDate = function (date, locale) {
   const calcDaysPassed = (date1, date2) =>
     Math.round(Math.abs(date2 - date1) / (1000 * 60 * 60 * 24));
 
@@ -116,12 +116,21 @@ const formarMovementDate = function (date) {
   if (daysPassed === 1) return `Yesterday`;
   if (daysPassed <= 7) return `${daysPassed} days ago`;
   else {
-    const day = `${date.getDate()}`.padStart(2, 0);
-    const month = `${date.getMonth() + 1}`.padStart(2, 0);
-    const year = date.getFullYear();
+    // const day = `${date.getDate()}`.padStart(2, 0);
+    // const month = `${date.getMonth() + 1}`.padStart(2, 0);
+    // const year = date.getFullYear();
 
-    return `${day}/${month}/${year}`;
+    // return `${day}/${month}/${year}`;
+
+    return new Intl.DateTimeFormat(locale).format(date);
   }
+};
+
+const formatCur = function (value, locale, currency) {
+  return new Intl.NumberFormat(locale, {
+    style: `currency`,
+    currency: currency,
+  }).format(value);
 };
 
 const displayMovements = function (acc, sort = false) {
@@ -135,13 +144,16 @@ const displayMovements = function (acc, sort = false) {
     const type = mov > 0 ? `deposit` : `withdrawal`;
 
     const date = new Date(acc.movementsDates[i]);
-    const displayDate = formarMovementDate(date);
+    const displayDate = formarMovementDate(date, acc.locale);
+
+    const formattedMov = formatCur(mov, acc.locale, acc.currency);
+
     const html = `<div class="movements__row">
       <div class="movements__type movements__type--${type}">${
       i + 1
     } ${type}</div>
       <div class="movements__date">${displayDate}</div>
-      <div class="movements__value">${mov.toFixed(2)}</div>
+      <div class="movements__value">${formattedMov}</div>
     </div>`;
 
     //inserting modified html into the movements container as rows
@@ -151,20 +163,19 @@ const displayMovements = function (acc, sort = false) {
 
 const calcPrintBalance = function (acc) {
   acc.balance = acc.movements.reduce((acc, val) => acc + val, 0);
-
-  labelBalance.textContent = `${acc.balance.toFixed(2)} £`;
+  labelBalance.textContent = formatCur(acc.balance, acc.locale, acc.currency);
 };
 
 const calcDisplaySummary = function (acc) {
   const incomes = acc.movements
     .filter((mov) => mov > 0)
     .reduce((acc, mov) => acc + mov, 0);
-  labelSumIn.textContent = `${incomes.toFixed(2)}£`;
+  labelSumIn.textContent = formatCur(incomes, acc.locale, acc.currency);
 
   const out = acc.movements
     .filter((mov) => mov < 0)
     .reduce((acc, mov) => acc + mov, 0);
-  labelSumOut.textContent = `${Math.abs(out).toFixed(2)}£`;
+  labelSumOut.textContent = formatCur(Math.abs(out), acc.locale, acc.currency);
 
   //assuming the bank takes interest on each deposit of 1.2%
   const interest = acc.movements
@@ -172,7 +183,7 @@ const calcDisplaySummary = function (acc) {
     .map((deposit) => (deposit * acc.interestRate) / 100)
     .reduce((acc, int) => acc + int, 0);
 
-  labelSumInterest.textContent = `${interest.toFixed(2)}£`;
+  labelSumInterest.textContent = formatCur(interest, acc.locale, acc.currency);
 };
 
 const createUserNames = function (accs) {
@@ -195,11 +206,38 @@ const updateUI = function (currentAccount) {
   calcDisplaySummary(currentAccount);
 };
 
-let currentAccount;
+//logout timer
+const startLogoutTimer = function () {
+  const tick = function () {
+    const min = String(Math.trunc(time / 60)).padStart(2, 0);
+    const sec = String(time % 60).padStart(2, 0);
 
-currentAccount = account1;
-updateUI(currentAccount);
-containerApp.style.opacity = 100;
+    labelTimer.textContent = `${min}: ${sec}`;
+
+    // derease 1s    //IN EACH CALL, print the remaining time to UI
+
+    //When 0 seconds, stop timer and log out user
+    if (time === 0) {
+      clearInterval(timer);
+      labelWelcome.textContent = `log in to get started`;
+      containerApp.style.opacity = 0;
+    }
+
+    time--;
+  };
+  // set time to 5min
+  let time = 120;
+  //call the timer every second
+  tick();
+  const timer = setInterval(tick, 1000);
+  return timer;
+};
+
+let currentAccount, timer;
+
+// currentAccount = account1;
+// updateUI(currentAccount);
+// containerApp.style.opacity = 100;
 
 btnLogin.addEventListener("click", function (e) {
   e.preventDefault();
@@ -244,6 +282,8 @@ btnLogin.addEventListener("click", function (e) {
     inputLoginUsername.value = inputLoginPin.value = ``;
     inputLoginPin.blur();
 
+    if (timer) clearInterval(timer);
+    timer = startLogoutTimer();
     // update
     updateUI(currentAccount);
   }
@@ -275,22 +315,27 @@ btnTransfer.addEventListener(`click`, function (e) {
     receiverAcc.movementsDates.push(new Date().toISOString());
     //update UI
     updateUI(currentAccount);
+
+    //Reset timer
+    clearInterval(timer);
+    timer = startLogoutTimer();
   }
 });
 
 btnLoan.addEventListener(`click`, function (e) {
   e.preventDefault();
   const amount = Math.floor(inputLoanAmount.value);
-  if (
-    amount > 0 &&
-    currentAccount.movements.some((mov) => mov >= amount / 10)
-  ) {
-    currentAccount.movements.push(amount);
+  if (amount > 0 && currentAccount.movements.some((mov) => mov >= amount / 10))
+    setTimeout(function () {
+      currentAccount.movements.push(amount);
 
-    currentAccount.movementsDates.push(new Date().toISOString());
+      currentAccount.movementsDates.push(new Date().toISOString());
 
-    updateUI(currentAccount);
-  }
+      updateUI(currentAccount);
+
+      clearInterval(timer);
+      timer = startLogoutTimer();
+    }, 2500);
   inputLoanAmount.value = ``;
 });
 
@@ -330,5 +375,10 @@ dogs.forEach((dog) => (dog.recFood = Math.trunc(dog.weight ** 0.75 * 28)));
 console.log(dogs);
 
 const dogSarah = dogs.find((dog) => dog.owners.includes(`Sarah`));
+
+// setInterval(function () {
+//   const now = new Date();
+//   timer.textContent = `${now}`;
+// }, 1000);
 
 // cl;
